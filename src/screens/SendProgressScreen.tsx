@@ -39,55 +39,55 @@ const SendProgressScreen: React.FC<Props> = ({navigation, route}) => {
   const startedRef = useRef(false);
 
   useEffect(() => {
-    initSending();
-  }, []);
+    const initSending = async () => {
+      // Guard so a re-run of this effect never sends the batch twice
+      if (startedRef.current) {
+        return;
+      }
+      startedRef.current = true;
 
-  const initSending = async () => {
-    if (startedRef.current) {
-      return;
-    }
-    startedRef.current = true;
+      const t = await getTemplateById(templateId);
+      if (!t) {
+        Alert.alert('Error', 'Template not found.', [
+          {text: 'OK', onPress: () => navigation.goBack()},
+        ]);
+        return;
+      }
+      setTemplate(t);
 
-    const t = await getTemplateById(templateId);
-    if (!t) {
-      Alert.alert('Error', 'Template not found.', [
-        {text: 'OK', onPress: () => navigation.goBack()},
-      ]);
-      return;
-    }
-    setTemplate(t);
-
-    const smtpConfig = await getSmtpConfig();
-    if (!smtpConfig) {
-      Alert.alert(
-        'SMTP Not Configured',
-        'Please configure your SMTP settings first.',
-        [
-          {
-            text: 'Configure',
-            onPress: () => {
-              navigation.goBack();
-              navigation.navigate('SmtpSettings');
+      const smtpConfig = await getSmtpConfig();
+      if (!smtpConfig) {
+        Alert.alert(
+          'SMTP Not Configured',
+          'Please configure your SMTP settings first.',
+          [
+            {
+              text: 'Configure',
+              onPress: () => {
+                navigation.goBack();
+                navigation.navigate('SmtpSettings');
+              },
             },
-          },
-        ],
-      );
-      return;
-    }
+          ],
+        );
+        return;
+      }
 
-    setIsSending(true);
-    const result = await sendBulkEmails(
-      t,
-      recipients,
-      smtpConfig,
-      (p: SendProgress) => {
-        setProgress({...p, results: [...p.results]});
-      },
-    );
-    setIsSending(false);
-    setIsComplete(true);
-    setProgress(result);
-  };
+      setIsSending(true);
+      const result = await sendBulkEmails(
+        t,
+        recipients,
+        smtpConfig,
+        (p: SendProgress) => {
+          setProgress({...p, results: [...p.results]});
+        },
+      );
+      setIsSending(false);
+      setIsComplete(true);
+      setProgress(result);
+    };
+    initSending();
+  }, [templateId, recipients, navigation]);
 
   const percentage =
     progress.total > 0

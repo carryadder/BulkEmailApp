@@ -28,13 +28,12 @@ const PreviewScreen: React.FC<Props> = ({navigation, route}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    const loadTemplate = async () => {
+      const t = await getTemplateById(templateId);
+      setTemplate(t);
+    };
     loadTemplate();
-  }, []);
-
-  const loadTemplate = async () => {
-    const t = await getTemplateById(templateId);
-    setTemplate(t);
-  };
+  }, [templateId]);
 
   if (!template) {
     return (

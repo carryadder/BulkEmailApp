@@ -10,7 +10,13 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {pick} from 'react-native-document-picker';
+import {
+  pick,
+  keepLocalCopy,
+  types,
+  errorCodes,
+  isErrorWithCode,
+} from '@react-native-documents/picker';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList, Recipient} from '../types';
 import {Colors} from '../utils/colors';
@@ -23,7 +29,7 @@ type Props = {
 };
 
 const ImportExcelScreen: React.FC<Props> = ({navigation}) => {
-  const {setRecipients, setColumns, recipients, columns} = useAppContext();
+  const {setRecipients, setColumns, recipients} = useAppContext();
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [localRecipients, setLocalRecipients] = useState<Recipient[]>([]);
@@ -32,10 +38,7 @@ const ImportExcelScreen: React.FC<Props> = ({navigation}) => {
   const handlePickFile = async () => {
     try {
       const [result] = await pick({
-        type: [
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-excel',
-        ],
+        type: [types.xlsx, types.xls],
       });
 
       if (!result) {
@@ -43,9 +46,19 @@ const ImportExcelScreen: React.FC<Props> = ({navigation}) => {
       }
 
       setLoading(true);
-      setFileName(result.name || 'Unknown file');
+      const name = result.name || 'spreadsheet.xlsx';
+      setFileName(name);
 
-      const parsed = await parseExcelFile(result.uri);
+      // Copy the picked content:// uri into app storage so RNFS can read it
+      const [copy] = await keepLocalCopy({
+        files: [{uri: result.uri, fileName: name}],
+        destination: 'cachesDirectory',
+      });
+      if (copy.status !== 'success') {
+        throw new Error(copy.copyError);
+      }
+
+      const parsed = await parseExcelFile(copy.localUri);
       setLocalRecipients(parsed.recipients);
       setLocalColumns(parsed.columns);
       setLoading(false);
@@ -56,7 +69,10 @@ const ImportExcelScreen: React.FC<Props> = ({navigation}) => {
       );
     } catch (error) {
       setLoading(false);
-      if (error instanceof Error && error.message.includes('cancel')) {
+      if (
+        isErrorWithCode(error) &&
+        error.code === errorCodes.OPERATION_CANCELED
+      ) {
         return;
       }
       Alert.alert(
